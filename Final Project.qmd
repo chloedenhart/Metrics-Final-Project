@@ -474,6 +474,7 @@ summary(model2)
 # Check multicollinearity
 vif(model2)
 ```
+In Model 2, both offensive and defensive performance metrics are significant predictors of NBA player salary. A 1-unit increase in offensive RAPM is associated with a 47.3% increase in salary, while a 1-unit increase in defensive RAPM corresponds to a 23.6% increase, holding other variables constant. Salaries appear to decline slightly over time when controlling for performance, with each additional year associated with a 5.5% decrease. However, the model explains only about 8.6% of the variance in salaries, suggesting that many non-performance factors influence pay. No multicollinearity issues are detected.
 
 ### 7.3 Non-Linear Effects
 
@@ -482,6 +483,7 @@ vif(model2)
 model3 <- lm(log(Salary) ~ LA_RAPM + I(LA_RAPM^2) + Year, data = player_data)
 summary(model3)
 ```
+In this quadratic model, both the linear and squared terms for RAPM are positive and highly significant. This suggests that player salary increases at an increasing rate with RAPM — players with exceptionally high RAPM earn disproportionately more than players with moderate RAPM. The adjusted R² improves to 10.7%, indicating that introducing nonlinearity better captures salary variation than a purely linear model. As in previous models, the year coefficient is negative, suggesting slight salary declines over time when holding performance constant.
 
 ### 7.4 Interaction with Year
 
@@ -507,6 +509,8 @@ models_comparison <- data.frame(
 kable(models_comparison, digits = 4,
       caption = "Regression Model Comparison")
 ```
+
+Comparing model fits shows that introducing non-linearity (Model 3) substantially improves the ability to explain NBA player salaries relative to simpler linear models. The quadratic RAPM model achieves the highest adjusted R² (10.68%), while splitting RAPM into offense and defense components (Model 2) provides modest gains over a basic RAPM model. Allowing the RAPM effect to vary across years (Model 4) slightly raises R² but fails to improve adjusted R², suggesting the interaction terms add complexity without significantly improving explanatory power.
 
 ### 7.5 Regression Diagnostics
 
@@ -534,6 +538,7 @@ ggplot(player_data, aes(x = log(Salary), y = Predicted_Log_Salary)) +
   theme_minimal() +
   coord_equal()
 ```
+The predicted vs. actual plot shows that while the model captures some of the variation in log salaries, substantial prediction error remains. The model tends to overestimate lower salaries and exhibits considerable scatter across all salary levels, reflecting the modest R² values observed. No obvious year-specific bias appears, suggesting the model's performance is relatively consistent across seasons.
 
 ## 8. Analyzing Value Inefficiencies
 
@@ -594,6 +599,8 @@ kable(format_salary_table(overpaid_players),
 kable(format_salary_table(underpaid_players), 
       caption = "Top 15 Potentially Underpaid Players")
 ```
+
+This visual shows us a lot of players were overpaid. 
 
 ## 9. Discussion & Findings
 

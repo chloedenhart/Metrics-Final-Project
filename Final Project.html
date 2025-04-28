@@ -966,6 +966,7 @@ F-statistic:    60 on 3 and 1918 DF,  p-value: &lt; 2.2e-16</code></pre>
     1.014062     1.008428     1.008290 </code></pre>
 </div>
 </div>
+<p>In Model 2, both offensive and defensive performance metrics are significant predictors of NBA player salary. A 1-unit increase in offensive RAPM is associated with a 47.3% increase in salary, while a 1-unit increase in defensive RAPM corresponds to a 23.6% increase, holding other variables constant. Salaries appear to decline slightly over time when controlling for performance, with each additional year associated with a 5.5% decrease. However, the model explains only about 8.6% of the variance in salaries, suggesting that many non-performance factors influence pay. No multicollinearity issues are detected.</p>
 </section>
 <section id="non-linear-effects" class="level3">
 <h3 class="anchored" data-anchor-id="non-linear-effects">7.3 Non-Linear Effects</h3>
@@ -996,6 +997,7 @@ Multiple R-squared:  0.1082,    Adjusted R-squared:  0.1068
 F-statistic: 77.59 on 3 and 1918 DF,  p-value: &lt; 2.2e-16</code></pre>
 </div>
 </div>
+<p>In this quadratic model, both the linear and squared terms for RAPM are positive and highly significant. This suggests that player salary increases at an increasing rate with RAPM — players with exceptionally high RAPM earn disproportionately more than players with moderate RAPM. The adjusted R² improves to 10.7%, indicating that introducing nonlinearity better captures salary variation than a purely linear model. As in previous models, the year coefficient is negative, suggesting slight salary declines over time when holding performance constant.</p>
 </section>
 <section id="interaction-with-year" class="level3">
 <h3 class="anchored" data-anchor-id="interaction-with-year">7.4 Interaction with Year</h3>
@@ -1084,6 +1086,7 @@ F-statistic: 16.41 on 11 and 1910 DF,  p-value: &lt; 2.2e-16</code></pre>
 </table>
 </div>
 </div>
+<p>Comparing model fits shows that introducing non-linearity (Model 3) substantially improves the ability to explain NBA player salaries relative to simpler linear models. The quadratic RAPM model achieves the highest adjusted R² (10.68%), while splitting RAPM into offense and defense components (Model 2) provides modest gains over a basic RAPM model. Allowing the RAPM effect to vary across years (Model 4) slightly raises R² but fails to improve adjusted R², suggesting the interaction terms add complexity without significantly improving explanatory power.</p>
 </section>
 <section id="regression-diagnostics" class="level3">
 <h3 class="anchored" data-anchor-id="regression-diagnostics">7.5 Regression Diagnostics</h3>
@@ -1125,6 +1128,7 @@ F-statistic: 16.41 on 11 and 1910 DF,  p-value: &lt; 2.2e-16</code></pre>
 </div>
 </div>
 </div>
+<p>The predicted vs.&nbsp;actual plot shows that while the model captures some of the variation in log salaries, substantial prediction error remains. The model tends to overestimate lower salaries and exhibits considerable scatter across all salary levels, reflecting the modest R² values observed. No obvious year-specific bias appears, suggesting the model’s performance is relatively consistent across seasons.</p>
 </section>
 </section>
 <section id="analyzing-value-inefficiencies" class="level2">
@@ -1484,6 +1488,7 @@ the `.groups` argument.</code></pre>
 </table>
 </div>
 </div>
+<p>This visual shows us a lot of players were overpaid.</p>
 </section>
 <section id="discussion-findings" class="level2">
 <h2 class="anchored" data-anchor-id="discussion-findings">9. Discussion &amp; Findings</h2>
