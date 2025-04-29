@@ -1,0 +1,638 @@
+---
+title: "NBA Salary and Performance Analysis: Investigating the Relationship Between Pay and Performance"
+author: "Chloe Denhart"
+format: html
+editor: visual
+---
+
+## Introduction
+
+This analysis explores the relationship between NBA player salaries and their on-court performance. The sports industry presents a unique opportunity to study labor economics as performance metrics are abundant and salaries are publicly available. We aim to determine which performance metrics most strongly predict player compensation and whether NBA teams efficiently allocate their salary resources.
+
+```{r setup}
+# Load required libraries
+library(tidyverse)
+library(ggplot2)
+library(corrplot)
+library(car)
+library(gridExtra)
+library(scales)
+library(knitr)
+library(broom)
+library(ggthemes)
+
+# Set seed for reproducibility
+set.seed(42)
+
+# Set default theme for consistent visualizations
+theme_set(theme_minimal())
+```
+
+## 1. Research Question & Hypotheses
+
+**Primary Research Question:**\
+To what extent do RAPM (Regularized Adjusted Plus-Minus) and other advanced performance metrics predict NBA player salaries, and are there systematic inefficiencies in how teams compensate players?
+
+**Hypotheses:**
+
+1.  **H1:** RAPM metrics will have stronger correlation with salary than traditional statistics.
+
+2.  **H2:** Veteran players receive salaries higher than predicted by their performance metrics, suggesting compensation for past performance or reputation.
+
+3.  **H3:** There are systematic inefficiencies in salary allocation across different performance dimensions (offensive vs. defensive RAPM).
+
+4.  **H4:** Salary trends across seasons show a consistent relationship with player performance metrics.
+
+## 2. Data Acquisition & Preparation
+
+```{r}
+# Load salary and performance data with the correct column names
+salaries_df <- read.csv("ranked salary.csv") # Adjust filename as needed
+stats_df <- read.csv("rapm.csv")
+
+# View structure of datasets
+str(salaries_df)
+str(stats_df)
+
+# Display first few rows of each dataset
+head(salaries_df)
+head(stats_df)
+```
+
+### Data Source Description
+
+Our analysis combines two primary datasets:
+
+1.  **NBA Player Salaries** (`ranked_salary.csv`): Contains player names and their annual salaries across multiple seasons (2015-2020).
+
+2.  **Player Performance Statistics** (`rapm.csv`): Contains comprehensive player statistics including RAPM metrics for offensive and defensive performance.
+
+These datasets provide the necessary variables to study the relationship between player compensation and on-court contribution.
+
+## 3. Data Cleaning & Transformation
+
+```{r}
+# Clean salaries data - adjust column names based on actual data
+salaries_clean <- salaries_df %>%
+  # Rename columns for clarity if needed
+  rename(Player = Player) %>%
+  # Select relevant salary columns
+  select(Player, X2020, X2019, X2018, X2017, X2016, X2015) %>%
+  # Convert to long format for multi-year analysis
+  pivot_longer(
+    cols = starts_with("X"),
+    names_to = "Year",
+    values_to = "Salary"
+  ) %>%
+  # Clean up year format
+  mutate(
+    Year = as.numeric(str_replace(Year, "X", "")),
+    # Remove any rows with NA salaries
+    Salary = as.numeric(Salary)
+  ) %>%
+  filter(!is.na(Salary))
+
+# Clean stats data - adjust based on actual columns
+stats_clean <- stats_df %>%
+  # Rename the player column to match salaries dataset
+  rename(Player = playerName) %>%
+  # Create a year variable if there's a season column
+  mutate(
+    Year = as.numeric(sub("^(\\d{4}).*", "\\1", season)),
+    # Create derived metrics if needed
+    Offensive_Value = LA_RAPM__Off,
+    Defensive_Value = LA_RAPM__Def,
+    Total_Value = LA_RAPM
+  )
+
+# Merge datasets - make sure the joining columns match
+player_data <- inner_join(stats_clean, salaries_clean, by = c("Player", "Year")) %>%
+  # Remove any invalid data
+  filter(!is.na(Salary), !is.na(LA_RAPM))
+
+# Check for missing values
+missing_data <- player_data %>%
+  summarize(across(everything(), ~sum(is.na(.)))) %>%
+  gather(Variable, Missing_Count) %>%
+  filter(Missing_Count > 0) %>%
+  arrange(desc(Missing_Count))
+
+# Display missing data
+if(nrow(missing_data) > 0) {
+  print("Variables with missing values:")
+  print(missing_data)
+} else {
+  print("No missing values found in the merged dataset")
+}
+
+# Summary of merged data
+cat("Merged dataset has", nrow(player_data), "player-season observations\n")
+```
+
+### Data Cleaning Process:
+
+1.  Standardized player names between datasets
+2.  Transformed salary data from wide to long format to enable multi-year analysis
+3.  Created derived performance metrics from raw RAPM data
+4.  Combined datasets using player names and years as the joining keys
+
+## 4. Exploratory Data Analysis (EDA)
+
+### 4.1 Summary Statistics
+
+```{r}
+# Key statistics summary
+performance_vars <- c("LA_RAPM", "LA_RAPM__Off", "LA_RAPM__Def", "RAPM", "Salary", "Year")
+summary_stats <- player_data %>% 
+  select(all_of(performance_vars)) %>%
+  summary()
+
+# Create a more readable summary table
+summary_table <- player_data %>%
+  select(all_of(performance_vars)) %>%
+  summarize(across(everything(), 
+                   list(Mean = ~mean(., na.rm = TRUE),
+                        Median = ~median(., na.rm = TRUE),
+                        SD = ~sd(., na.rm = TRUE),
+                        Min = ~min(., na.rm = TRUE),
+                        Max = ~max(., na.rm = TRUE)))) %>%
+  pivot_longer(cols = everything(), 
+               names_to = c("Variable", "Statistic"),
+               names_pattern = "(.*)_(.*)") %>%
+  pivot_wider(names_from = Statistic, values_from = value) %>%
+  arrange(factor(Variable, levels = performance_vars))
+
+# Display summary statistics
+kable(summary_table, digits = 2, caption = "Summary Statistics of Key Variables")
+```
+
+### 4.2 Salary Distribution
+
+```{r}
+# Salary distribution visualizations
+p1 <- ggplot(player_data, aes(x = Salary)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "black", alpha = 0.7) +
+  scale_x_continuous(labels = label_dollar(scale = 1/1e6, suffix = "M")) +
+  labs(title = "Distribution of NBA Player Salaries", 
+       subtitle = "Highly right-skewed distribution suggests log transformation needed",
+       x = "Salary ($M)", y = "Count") +
+  theme_minimal()
+
+p2 <- ggplot(player_data, aes(x = log(Salary))) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "black", alpha = 0.7) +
+  labs(title = "Log-Transformed Salary Distribution", 
+       subtitle = "More normally distributed after log transformation",
+       x = "Log(Salary)", y = "Count") +
+  theme_minimal()
+
+# QQ plot for log salary
+p3 <- ggplot(player_data, aes(sample = log(Salary))) +
+  stat_qq() + 
+  stat_qq_line(color = "red") +
+  labs(title = "Q-Q Plot of Log-Transformed Salary",
+       subtitle = "Testing for normality of log salaries",
+       x = "Theoretical Quantiles", 
+       y = "Sample Quantiles") +
+  theme_minimal()
+
+# Salary by year boxplot
+p4 <- ggplot(player_data, aes(x = factor(Year), y = Salary/1e6, fill = factor(Year))) +
+  geom_boxplot(alpha = 0.7) +
+  scale_y_continuous(labels = label_dollar(suffix = "M")) +
+  labs(title = "Salary Distribution by Year",
+       x = "Year", y = "Salary ($M)") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Show plots
+grid.arrange(p1, p2, p3, p4, ncol = 2)
+```
+
+**Observations:** - NBA salaries show a strong positive skew with a few players earning significantly more than others - Log transformation produces a more normally distributed variable (confirmed by Q-Q plot), which will be better for regression analysis - The year-by-year salary distribution shows an increasing trend, likely reflecting salary cap growth
+
+### 4.3 Performance Metrics Distribution
+
+```{r}
+# Create plots for key performance metrics
+p5 <- ggplot(player_data, aes(x = LA_RAPM)) +
+  geom_histogram(bins = 25, fill = "darkgreen", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of LA_RAPM", x = "LA_RAPM", y = "Count") +
+  theme_minimal()
+
+p6 <- ggplot(player_data, aes(x = LA_RAPM__Off)) +
+  geom_histogram(bins = 25, fill = "darkred", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Offensive RAPM", x = "LA_RAPM__Off", y = "Count") +
+  theme_minimal()
+
+p7 <- ggplot(player_data, aes(x = LA_RAPM__Def)) +
+  geom_histogram(bins = 25, fill = "darkorange", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Defensive RAPM", x = "LA_RAPM__Def", y = "Count") +
+  theme_minimal()
+
+p8 <- ggplot(player_data, aes(x = RAPM)) +
+  geom_histogram(bins = 25, fill = "darkblue", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of RAPM", x = "RAPM", y = "Count") +
+  theme_minimal()
+
+# Show plots
+grid.arrange(p5, p6, p7, p8, ncol = 2)
+```
+
+**Observations:** - RAPM metrics are approximately normally distributed around zero - The distributions of offensive and defensive RAPM show similar patterns - These distributions differ from typical salary distributions, suggesting a non-linear relationship between performance and compensation
+
+### 4.4 Salary vs. Performance Relationships
+
+```{r}
+# Performance plot function 
+performance_plot <- function(data, metric, title, log_y = FALSE) {
+  p <- ggplot(data, aes_string(x = metric, y = "Salary")) +
+    geom_point(aes(color = factor(Year)), alpha = 0.6) +
+    geom_smooth(method = "loess", se = TRUE, color = "red", size = 1) +
+    scale_y_continuous(labels = label_dollar(scale = 1/1e6, suffix = "M")) +
+    labs(title = title, 
+         y = "Salary ($M)", 
+         x = metric,
+         color = "Year") +
+    theme_minimal()
+  
+  if(log_y) {
+    p <- p + scale_y_log10(labels = label_dollar(scale = 1/1e6, suffix = "M")) +
+         labs(y = "Salary ($M, log scale)")
+  }
+  
+  return(p)
+}
+
+# Create plots with log-transformed salary
+p9 <- performance_plot(player_data, "LA_RAPM", "Salary vs LA_RAPM", log_y = TRUE)
+p10 <- performance_plot(player_data, "LA_RAPM__Off", "Salary vs Offensive RAPM", log_y = TRUE)
+p11 <- performance_plot(player_data, "LA_RAPM__Def", "Salary vs Defensive RAPM", log_y = TRUE)
+p12 <- performance_plot(player_data, "RAPM", "Salary vs RAPM", log_y = TRUE)
+
+# Show plots
+grid.arrange(p9, p10, p11, p12, ncol = 2)
+```
+
+**Observations:** - Clear positive relationships between salary and each RAPM metric - The LOESS smoothing curves suggest non-linear relationships - The relationship appears stronger for offensive metrics than defensive metrics - Year-to-year variation is evident in the salary-performance relationship
+
+### 4.5 Year-over-Year Trends
+
+```{r}
+# Year-over-year visualization
+year_summary <- player_data %>%
+  group_by(Year) %>%
+  summarize(
+    Avg_Salary = mean(Salary, na.rm = TRUE),
+    Median_Salary = median(Salary, na.rm = TRUE),
+    Avg_RAPM = mean(LA_RAPM, na.rm = TRUE),
+    Correlation = cor(Salary, LA_RAPM, use = "complete.obs")
+  )
+
+# Create plots
+p13 <- ggplot(year_summary, aes(x = Year)) +
+  geom_line(aes(y = Avg_Salary/1e6), color = "steelblue", size = 1) +
+  geom_point(aes(y = Avg_Salary/1e6), color = "steelblue", size = 3) +
+  scale_y_continuous(labels = label_dollar(suffix = "M")) +
+  labs(title = "Average NBA Salary by Year", 
+       y = "Average Salary ($M)", 
+       x = "Year") +
+  theme_minimal()
+
+p14 <- ggplot(year_summary, aes(x = Year, y = Correlation)) +
+  geom_line(color = "darkred", size = 1) +
+  geom_point(color = "darkred", size = 3) +
+  labs(title = "Salary-RAPM Correlation by Year",
+       y = "Correlation Coefficient",
+       x = "Year") +
+  theme_minimal()
+
+# Salary vs RAPM by year
+p15 <- ggplot(player_data, aes(x = LA_RAPM, y = log(Salary))) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~Year) +
+  labs(title = "Salary vs RAPM Relationship by Year",
+       x = "LA_RAPM",
+       y = "Log Salary") +
+  theme_minimal()
+
+# Show plots
+grid.arrange(p13, p14, ncol = 2)
+print(p15)
+```
+
+**Observations:** - Average salaries show a clear upward trend over the years - The correlation between RAPM and salary fluctuates by year - The relationship between performance and salary appears relatively consistent across years, but with some variation in slope
+
+## 5. Correlation Analysis
+
+```{r}
+# Select variables for correlation analysis
+player_vars <- c("LA_RAPM", "LA_RAPM__Off", "LA_RAPM__Def", "RAPM", "RAPM__Off", "RAPM__Def", "Salary", "Year")
+player_corr <- cor(player_data[player_vars], use = "pairwise.complete.obs")
+
+# Create enhanced correlation plot
+corrplot(player_corr, method = "color", type = "upper", 
+         tl.col = "black", tl.srt = 45,
+         addCoef.col = "black", number.cex = 0.7,
+         col = colorRampPalette(c("#D73027", "#FFFFBF", "#1A9850"))(200),
+         title = "Correlation Matrix of Player Variables")
+
+# Create a dataframe of correlations with salary
+salary_corr <- data.frame(
+  Variable = names(player_corr["Salary", ]),
+  Correlation = as.numeric(player_corr["Salary", ])
+) %>%
+  filter(Variable != "Salary") %>%
+  arrange(desc(Correlation))
+
+# Plot correlations with salary
+ggplot(salary_corr, aes(x = reorder(Variable, Correlation), y = Correlation)) +
+  geom_bar(stat = "identity", fill = "steelblue", width = 0.7) +
+  coord_flip() +
+  labs(title = "Correlations with Player Salary",
+       subtitle = "Which metrics have strongest relationship with compensation?",
+       x = "", y = "Correlation Coefficient") +
+  theme_minimal()
+```
+
+**Observations:** - LA_RAPM metrics show moderate positive correlations with salary - Offensive metrics generally show stronger correlations with salary than defensive metrics - Year also shows a positive correlation with salary, reflecting the increasing salary cap - There's high correlation among different RAPM variants, suggesting they measure similar aspects of performance
+
+## 6. Advanced Exploratory Analysis
+
+### 6.1 Offensive vs. Defensive Value
+
+```{r}
+# Calculate offensive vs defensive balance
+player_data <- player_data %>%
+  mutate(
+    Off_Def_Ratio = ifelse(LA_RAPM__Def != 0, LA_RAPM__Off / abs(LA_RAPM__Def), NA),
+    Off_Bias = ifelse(LA_RAPM != 0, LA_RAPM__Off / LA_RAPM, NA),
+    Value_Category = case_when(
+      LA_RAPM__Off > 0 & LA_RAPM__Def > 0 ~ "Two-Way Positive",
+      LA_RAPM__Off > 0 & LA_RAPM__Def <= 0 ~ "Offense Only",
+      LA_RAPM__Off <= 0 & LA_RAPM__Def > 0 ~ "Defense Only",
+      LA_RAPM__Off <= 0 & LA_RAPM__Def <= 0 ~ "Negative Impact",
+      TRUE ~ "Unknown"
+    )
+  )
+
+# Visualize offensive vs defensive RAPM
+ggplot(player_data, aes(x = LA_RAPM__Def, y = LA_RAPM__Off)) +
+  geom_point(aes(color = log(Salary), size = Salary), alpha = 0.7) +
+  scale_color_viridis_c(name = "Log Salary") +
+  scale_size_continuous(name = "Salary", labels = label_dollar(scale = 1/1e6, suffix = "M")) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray") +
+  labs(title = "Offensive vs Defensive RAPM",
+       subtitle = "With salary indicated by color and size",
+       x = "Defensive RAPM",
+       y = "Offensive RAPM") +
+  theme_minimal()
+
+# Salary by player value category
+ggplot(player_data, aes(x = Value_Category, y = log(Salary), fill = Value_Category)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(title = "Salary Distribution by Player Value Type",
+       x = "",
+       y = "Log Salary") +
+  theme_minimal() +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### 6.2 Year-over-Year Performance vs. Salary Change
+
+```{r}
+# Create a dataset with year-over-year changes for players
+# First identify players with multiple years of data
+player_years <- player_data %>%
+  group_by(Player) %>%
+  summarize(Years = n()) %>%
+  filter(Years > 1)
+
+# Create lagged variables for returning players
+player_changes <- player_data %>%
+  filter(Player %in% player_years$Player) %>%
+  arrange(Player, Year) %>%
+  group_by(Player) %>%
+  mutate(
+    Prev_Year = lag(Year),
+    Prev_RAPM = lag(LA_RAPM),
+    RAPM_Change = LA_RAPM - lag(LA_RAPM),
+    Prev_Salary = lag(Salary),
+    Salary_Change = Salary - lag(Salary),
+    Salary_Pct_Change = (Salary - lag(Salary)) / lag(Salary) * 100
+  ) %>%
+  filter(!is.na(Prev_Year)) # Remove first observation for each player
+
+# Plot year-over-year changes
+ggplot(player_changes, aes(x = RAPM_Change, y = Salary_Pct_Change)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "loess", se = TRUE, color = "red") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray") +
+  labs(title = "Performance Change vs. Salary Change",
+       subtitle = "Do salary increases follow performance improvements?",
+       x = "Change in RAPM",
+       y = "% Change in Salary") +
+  theme_minimal()
+```
+
+## 7. Regression Models
+
+### 7.1 Basic Model: RAPM Metrics
+
+```{r}
+# Model 1: Simple RAPM model
+model1 <- lm(log(Salary) ~ LA_RAPM + Year, data = player_data)
+summary(model1)
+```
+
+### 7.2 Offensive vs. Defensive Components
+
+```{r}
+# Model 2: Separate offensive and defensive components
+model2 <- lm(log(Salary) ~ LA_RAPM__Off + LA_RAPM__Def + Year, data = player_data)
+summary(model2)
+
+# Check multicollinearity
+vif(model2)
+```
+
+In Model 2, both offensive and defensive performance metrics are significant predictors of NBA player salary. A 1-unit increase in offensive RAPM is associated with a 47.3% increase in salary, while a 1-unit increase in defensive RAPM corresponds to a 23.6% increase, holding other variables constant. Salaries appear to decline slightly over time when controlling for performance, with each additional year associated with a 5.5% decrease. However, the model explains only about 8.6% of the variance in salaries, suggesting that many non-performance factors influence pay. No multicollinearity issues are detected.
+
+### 7.3 Non-Linear Effects
+
+```{r}
+# Model 3: Testing for non-linear effects
+model3 <- lm(log(Salary) ~ LA_RAPM + I(LA_RAPM^2) + Year, data = player_data)
+summary(model3)
+```
+
+In this quadratic model, both the linear and squared terms for RAPM are positive and highly significant. This suggests that player salary increases at an increasing rate with RAPM — players with exceptionally high RAPM earn disproportionately more than players with moderate RAPM. The adjusted R² improves to 10.7%, indicating that introducing nonlinearity better captures salary variation than a purely linear model. As in previous models, the year coefficient is negative, suggesting slight salary declines over time when holding performance constant.
+
+### 7.4 Interaction with Year
+
+```{r}
+# Model 4: Performance-year interaction
+model4 <- lm(log(Salary) ~ LA_RAPM * factor(Year), data = player_data)
+summary(model4)
+
+# Compare models
+models_comparison <- data.frame(
+  Model = c("Basic RAPM", "Off-Def Components", "Non-Linear", "Year Interaction"),
+  R_Squared = c(summary(model1)$r.squared, 
+                summary(model2)$r.squared,
+                summary(model3)$r.squared,
+                summary(model4)$r.squared),
+  Adj_R_Squared = c(summary(model1)$adj.r.squared,
+                    summary(model2)$adj.r.squared,
+                    summary(model3)$adj.r.squared,
+                    summary(model4)$adj.r.squared)
+)
+
+# Display model comparison table
+kable(models_comparison, digits = 4,
+      caption = "Regression Model Comparison")
+```
+
+Comparing model fits shows that introducing non-linearity (Model 3) substantially improves the ability to explain NBA player salaries relative to simpler linear models. The quadratic RAPM model achieves the highest adjusted R² (10.68%), while splitting RAPM into offense and defense components (Model 2) provides modest gains over a basic RAPM model. Allowing the RAPM effect to vary across years (Model 4) slightly raises R² but fails to improve adjusted R², suggesting the interaction terms add complexity without significantly improving explanatory power.
+
+### 7.5 Regression Diagnostics
+
+```{r}
+# Plot diagnostics for best model
+par(mfrow = c(2, 2))
+plot(model4)
+par(mfrow = c(1, 1))
+
+# Get predicted values from best model
+player_data$Predicted_Log_Salary <- predict(model4, player_data)
+player_data$Predicted_Salary <- exp(player_data$Predicted_Log_Salary)
+player_data$Salary_Difference <- player_data$Salary - player_data$Predicted_Salary
+player_data$Pct_Difference <- (player_data$Salary - player_data$Predicted_Salary) / player_data$Predicted_Salary * 100
+
+# Plot predicted vs actual values
+ggplot(player_data, aes(x = log(Salary), y = Predicted_Log_Salary)) +
+  geom_point(aes(color = factor(Year)), alpha = 0.7) +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed") +
+  labs(title = "Model Fit: Predicted vs Actual Log Salary",
+       subtitle = "Points along diagonal line indicate perfect prediction",
+       x = "Actual Log Salary", 
+       y = "Predicted Log Salary",
+       color = "Year") +
+  theme_minimal() +
+  coord_equal()
+```
+
+The predicted vs. actual plot shows that while the model captures some of the variation in log salaries, substantial prediction error remains. The model tends to overestimate lower salaries and exhibits considerable scatter across all salary levels, reflecting the modest R² values observed. No obvious year-specific bias appears, suggesting the model's performance is relatively consistent across seasons.
+
+## 8. Analyzing Value Inefficiencies
+
+```{r}
+# Create value efficiency analysis
+value_analysis <- player_data %>%
+  mutate(
+    Value_Category = case_when(
+      Pct_Difference < -20 ~ "Underpaid",
+      Pct_Difference > 20 ~ "Overpaid",
+      TRUE ~ "Fair Value"
+    )
+  )
+
+# Count by category
+value_counts <- value_analysis %>%
+  group_by(Value_Category, Year) %>%
+  summarize(Count = n()) %>%
+  ungroup()
+
+# Plot value distribution by year
+ggplot(value_counts, aes(x = factor(Year), y = Count, fill = Value_Category)) +
+  geom_bar(stat = "identity", position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Distribution of Player Value Categories by Year",
+       subtitle = "Based on difference between actual and predicted salary",
+       x = "Year",
+       y = "Proportion",
+       fill = "Value Category") +
+  theme_minimal()
+
+# Top 15 overpaid players (by percentage)
+overpaid_players <- value_analysis %>%
+  arrange(desc(Pct_Difference)) %>%
+  select(Player, Year, LA_RAPM, Salary, Predicted_Salary, Pct_Difference) %>%
+  head(15)
+
+# Top 15 underpaid players (by percentage)
+underpaid_players <- value_analysis %>%
+  arrange(Pct_Difference) %>%
+  select(Player, Year, LA_RAPM, Salary, Predicted_Salary, Pct_Difference) %>%
+  head(15)
+
+# Format tables for display
+format_salary_table <- function(df) {
+  df %>%
+    mutate(
+      Salary = dollar(Salary/1e6, suffix = "M"),
+      Predicted_Salary = dollar(Predicted_Salary/1e6, suffix = "M"),
+      Pct_Difference = paste0(round(Pct_Difference, 1), "%")
+    )
+}
+
+# Display tables
+kable(format_salary_table(overpaid_players), 
+      caption = "Top 15 Potentially Overpaid Players")
+
+kable(format_salary_table(underpaid_players), 
+      caption = "Top 15 Potentially Underpaid Players")
+```
+
+This visual shows us a lot of players were overpaid.
+
+## 9. Discussion & Findings
+
+Based on our exploratory data analysis and regression modeling:
+
+1.  **RAPM as Salary Predictor**:
+    -   RAPM metrics show moderate correlation with player salaries
+    -   The relationship is statistically significant but explains only part of salary variation
+    -   Hypothesis H1 is partially supported: RAPM does predict salary but with limitations
+2.  **Offensive vs. Defensive Value**:
+    -   Offensive RAPM has a stronger relationship with salary than defensive RAPM
+    -   This suggests teams may value offensive contributions more highly in their compensation decisions
+    -   Hypothesis H3 is supported: there are systematic inefficiencies in how offensive vs. defensive contributions are valued
+3.  **Year-over-Year Analysis**:
+    -   Salary growth outpaces performance changes for many players
+    -   Changes in performance don't always correlate strongly with changes in compensation
+    -   Hypothesis H4 is supported: we observe consistent relationships between performance and salary across years
+4.  **Model Performance**:
+    -   Including year effects improves model performance considerably
+    -   The most complex model explains approximately XX% of variation in player salaries
+    -   Significant unexplained variation suggests other factors beyond RAPM affect compensation
+
+## 10. Limitations & Future Research
+
+**Limitations of the current analysis:**
+
+1.  **Limited metrics**: We focused primarily on RAPM metrics without traditional box score statistics
+2.  **Contract details**: We don't account for contract length, structure, or timing
+3.  **Market factors**: Team market size, cap space, and competitive situation aren't considered
+4.  **Player characteristics**: Age, experience, injury history, and intangible contributions aren't captured
+
+**Future research directions:**
+
+1.  Incorporate additional performance metrics beyond RAPM
+2.  Include contract details and salary cap information
+3.  Account for player experience and career trajectory
+4.  Consider team-level factors in salary determination
+5.  Develop a more comprehensive model of player value
+
+## 11. Conclusion
+
+This analysis demonstrates that NBA player salaries are related to on-court performance as measured by RAPM metrics, but the relationship is complex and influenced by various factors. Key findings suggest that:
+
+1.  RAPM metrics explain a significant portion of salary variation
+2.  Offensive contributions appear more highly valued than defensive contributions
+3.  Salary inefficiencies exist, with some players significantly over or underpaid relative to their statistical performance
+4.  Year-to-year trends show increasing salaries without corresponding performance increases
+
+These insights contribute to our understanding of NBA labor markets and suggest opportunities for teams to gain competitive advantages through more efficient salary allocation. Future research should focus on developing more comprehensive models of player value that incorporate additional factors beyond performance metrics.
