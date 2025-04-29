@@ -5,9 +5,13 @@ format: html
 editor: visual
 ---
 
+
+
 ## Introduction
 
 This analysis explores the relationship between NBA player salaries and their on-court performance. The sports industry presents a unique opportunity to study labor economics as performance metrics are abundant and salaries are publicly available. We aim to determine which performance metrics most strongly predict player compensation and whether NBA teams efficiently allocate their salary resources.
+
+
 
 ```{r setup}
 # Load required libraries
@@ -28,6 +32,8 @@ set.seed(42)
 theme_set(theme_minimal())
 ```
 
+
+
 ## 1. Research Question & Hypotheses
 
 **Primary Research Question:**  
@@ -45,6 +51,8 @@ To what extent do RAPM (Regularized Adjusted Plus-Minus) and other advanced perf
 
 ## 2. Data Acquisition & Preparation
 
+
+
 ```{r}
 # Load salary and performance data with the correct column names
 salaries_df <- read.csv("ranked salary.csv") # Adjust filename as needed
@@ -59,6 +67,8 @@ head(salaries_df)
 head(stats_df)
 ```
 
+
+
 ### Data Source Description
 
 Our analysis combines two primary datasets:
@@ -70,6 +80,8 @@ Our analysis combines two primary datasets:
 These datasets provide the necessary variables to study the relationship between player compensation and on-court contribution.
 
 ## 3. Data Cleaning & Transformation
+
+
 
 ```{r}
 # Clean salaries data - adjust column names based on actual data
@@ -129,6 +141,8 @@ if(nrow(missing_data) > 0) {
 cat("Merged dataset has", nrow(player_data), "player-season observations\n")
 ```
 
+
+
 ### Data Cleaning Process:
 
 1. Standardized player names between datasets
@@ -139,6 +153,8 @@ cat("Merged dataset has", nrow(player_data), "player-season observations\n")
 ## 4. Exploratory Data Analysis (EDA)
 
 ### 4.1 Summary Statistics
+
+
 
 ```{r}
 # Key statistics summary
@@ -166,7 +182,11 @@ summary_table <- player_data %>%
 kable(summary_table, digits = 2, caption = "Summary Statistics of Key Variables")
 ```
 
+
+
 ### 4.2 Salary Distribution
+
+
 
 ```{r}
 # Salary distribution visualizations
@@ -208,12 +228,16 @@ p4 <- ggplot(player_data, aes(x = factor(Year), y = Salary/1e6, fill = factor(Ye
 grid.arrange(p1, p2, p3, p4, ncol = 2)
 ```
 
+
+
 **Observations:**
 - NBA salaries show a strong positive skew with a few players earning significantly more than others
 - Log transformation produces a more normally distributed variable (confirmed by Q-Q plot), which will be better for regression analysis
 - The year-by-year salary distribution shows an increasing trend, likely reflecting salary cap growth
 
 ### 4.3 Performance Metrics Distribution
+
+
 
 ```{r}
 # Create plots for key performance metrics
@@ -241,12 +265,16 @@ p8 <- ggplot(player_data, aes(x = RAPM)) +
 grid.arrange(p5, p6, p7, p8, ncol = 2)
 ```
 
+
+
 **Observations:**
 - RAPM metrics are approximately normally distributed around zero
 - The distributions of offensive and defensive RAPM show similar patterns
 - These distributions differ from typical salary distributions, suggesting a non-linear relationship between performance and compensation
 
 ### 4.4 Salary vs. Performance Relationships
+
+
 
 ```{r}
 # Performance plot function 
@@ -279,6 +307,8 @@ p12 <- performance_plot(player_data, "RAPM", "Salary vs RAPM", log_y = TRUE)
 grid.arrange(p9, p10, p11, p12, ncol = 2)
 ```
 
+
+
 **Observations:**
 - Clear positive relationships between salary and each RAPM metric
 - The LOESS smoothing curves suggest non-linear relationships
@@ -286,6 +316,8 @@ grid.arrange(p9, p10, p11, p12, ncol = 2)
 - Year-to-year variation is evident in the salary-performance relationship
 
 ### 4.5 Year-over-Year Trends
+
+
 
 ```{r}
 # Year-over-year visualization
@@ -331,12 +363,16 @@ grid.arrange(p13, p14, ncol = 2)
 print(p15)
 ```
 
+
+
 **Observations:**
 - Average salaries show a clear upward trend over the years
 - The correlation between RAPM and salary fluctuates by year
 - The relationship between performance and salary appears relatively consistent across years, but with some variation in slope
 
 ## 5. Correlation Analysis
+
+
 
 ```{r}
 # Select variables for correlation analysis
@@ -368,6 +404,8 @@ ggplot(salary_corr, aes(x = reorder(Variable, Correlation), y = Correlation)) +
   theme_minimal()
 ```
 
+
+
 **Observations:**
 - LA_RAPM metrics show moderate positive correlations with salary
 - Offensive metrics generally show stronger correlations with salary than defensive metrics
@@ -377,6 +415,8 @@ ggplot(salary_corr, aes(x = reorder(Variable, Correlation), y = Correlation)) +
 ## 6. Advanced Exploratory Analysis
 
 ### 6.1 Offensive vs. Defensive Value
+
+
 
 ```{r}
 # Calculate offensive vs defensive balance
@@ -416,7 +456,11 @@ ggplot(player_data, aes(x = Value_Category, y = log(Salary), fill = Value_Catego
   theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
+
+
 ### 6.2 Year-over-Year Performance vs. Salary Change
+
+
 
 ```{r}
 # Create a dataset with year-over-year changes for players
@@ -454,9 +498,13 @@ ggplot(player_changes, aes(x = RAPM_Change, y = Salary_Pct_Change)) +
   theme_minimal()
 ```
 
+
+
 ## 7. Regression Models
 
 ### 7.1 Basic Model: RAPM Metrics
+
+
 
 ```{r}
 # Model 1: Simple RAPM model
@@ -464,7 +512,11 @@ model1 <- lm(log(Salary) ~ LA_RAPM + Year, data = player_data)
 summary(model1)
 ```
 
+
+
 ### 7.2 Offensive vs. Defensive Components
+
+
 
 ```{r}
 # Model 2: Separate offensive and defensive components
@@ -474,18 +526,26 @@ summary(model2)
 # Check multicollinearity
 vif(model2)
 ```
+
+
 In Model 2, both offensive and defensive performance metrics are significant predictors of NBA player salary. A 1-unit increase in offensive RAPM is associated with a 47.3% increase in salary, while a 1-unit increase in defensive RAPM corresponds to a 23.6% increase, holding other variables constant. Salaries appear to decline slightly over time when controlling for performance, with each additional year associated with a 5.5% decrease. However, the model explains only about 8.6% of the variance in salaries, suggesting that many non-performance factors influence pay. No multicollinearity issues are detected.
 
 ### 7.3 Non-Linear Effects
+
+
 
 ```{r}
 # Model 3: Testing for non-linear effects
 model3 <- lm(log(Salary) ~ LA_RAPM + I(LA_RAPM^2) + Year, data = player_data)
 summary(model3)
 ```
+
+
 In this quadratic model, both the linear and squared terms for RAPM are positive and highly significant. This suggests that player salary increases at an increasing rate with RAPM — players with exceptionally high RAPM earn disproportionately more than players with moderate RAPM. The adjusted R² improves to 10.7%, indicating that introducing nonlinearity better captures salary variation than a purely linear model. As in previous models, the year coefficient is negative, suggesting slight salary declines over time when holding performance constant.
 
 ### 7.4 Interaction with Year
+
+
 
 ```{r}
 # Model 4: Performance-year interaction
@@ -510,9 +570,13 @@ kable(models_comparison, digits = 4,
       caption = "Regression Model Comparison")
 ```
 
+
+
 Comparing model fits shows that introducing non-linearity (Model 3) substantially improves the ability to explain NBA player salaries relative to simpler linear models. The quadratic RAPM model achieves the highest adjusted R² (10.68%), while splitting RAPM into offense and defense components (Model 2) provides modest gains over a basic RAPM model. Allowing the RAPM effect to vary across years (Model 4) slightly raises R² but fails to improve adjusted R², suggesting the interaction terms add complexity without significantly improving explanatory power.
 
 ### 7.5 Regression Diagnostics
+
+
 
 ```{r}
 # Plot diagnostics for best model
@@ -538,9 +602,13 @@ ggplot(player_data, aes(x = log(Salary), y = Predicted_Log_Salary)) +
   theme_minimal() +
   coord_equal()
 ```
+
+
 The predicted vs. actual plot shows that while the model captures some of the variation in log salaries, substantial prediction error remains. The model tends to overestimate lower salaries and exhibits considerable scatter across all salary levels, reflecting the modest R² values observed. No obvious year-specific bias appears, suggesting the model's performance is relatively consistent across seasons.
 
 ## 8. Analyzing Value Inefficiencies
+
+
 
 ```{r}
 # Create value efficiency analysis
@@ -599,6 +667,8 @@ kable(format_salary_table(overpaid_players),
 kable(format_salary_table(underpaid_players), 
       caption = "Top 15 Potentially Underpaid Players")
 ```
+
+
 
 This visual shows us a lot of players were overpaid. 
 

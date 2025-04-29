@@ -30,18 +30,18 @@ theme_set(theme_minimal())
 
 ## 1. Research Question & Hypotheses
 
-**Primary Research Question:**  
+**Primary Research Question:**\
 To what extent do RAPM (Regularized Adjusted Plus-Minus) and other advanced performance metrics predict NBA player salaries, and are there systematic inefficiencies in how teams compensate players?
 
 **Hypotheses:**
 
-1. **H1:** RAPM metrics will have stronger correlation with salary than traditional statistics.
-   
-2. **H2:** Veteran players receive salaries higher than predicted by their performance metrics, suggesting compensation for past performance or reputation.
-   
-3. **H3:** There are systematic inefficiencies in salary allocation across different performance dimensions (offensive vs. defensive RAPM).
-   
-4. **H4:** Salary trends across seasons show a consistent relationship with player performance metrics.
+1.  **H1:** RAPM metrics will have stronger correlation with salary than traditional statistics.
+
+2.  **H2:** Veteran players receive salaries higher than predicted by their performance metrics, suggesting compensation for past performance or reputation.
+
+3.  **H3:** There are systematic inefficiencies in salary allocation across different performance dimensions (offensive vs. defensive RAPM).
+
+4.  **H4:** Salary trends across seasons show a consistent relationship with player performance metrics.
 
 ## 2. Data Acquisition & Preparation
 
@@ -63,9 +63,9 @@ head(stats_df)
 
 Our analysis combines two primary datasets:
 
-1. **NBA Player Salaries** (`ranked_salary.csv`): Contains player names and their annual salaries across multiple seasons (2015-2020).
+1.  **NBA Player Salaries** (`ranked_salary.csv`): Contains player names and their annual salaries across multiple seasons (2015-2020).
 
-2. **Player Performance Statistics** (`rapm.csv`): Contains comprehensive player statistics including RAPM metrics for offensive and defensive performance.
+2.  **Player Performance Statistics** (`rapm.csv`): Contains comprehensive player statistics including RAPM metrics for offensive and defensive performance.
 
 These datasets provide the necessary variables to study the relationship between player compensation and on-court contribution.
 
@@ -131,10 +131,10 @@ cat("Merged dataset has", nrow(player_data), "player-season observations\n")
 
 ### Data Cleaning Process:
 
-1. Standardized player names between datasets
-2. Transformed salary data from wide to long format to enable multi-year analysis
-3. Created derived performance metrics from raw RAPM data
-4. Combined datasets using player names and years as the joining keys
+1.  Standardized player names between datasets
+2.  Transformed salary data from wide to long format to enable multi-year analysis
+3.  Created derived performance metrics from raw RAPM data
+4.  Combined datasets using player names and years as the joining keys
 
 ## 4. Exploratory Data Analysis (EDA)
 
@@ -208,10 +208,7 @@ p4 <- ggplot(player_data, aes(x = factor(Year), y = Salary/1e6, fill = factor(Ye
 grid.arrange(p1, p2, p3, p4, ncol = 2)
 ```
 
-**Observations:**
-- NBA salaries show a strong positive skew with a few players earning significantly more than others
-- Log transformation produces a more normally distributed variable (confirmed by Q-Q plot), which will be better for regression analysis
-- The year-by-year salary distribution shows an increasing trend, likely reflecting salary cap growth
+**Observations:** - NBA salaries show a strong positive skew with a few players earning significantly more than others - Log transformation produces a more normally distributed variable (confirmed by Q-Q plot), which will be better for regression analysis - The year-by-year salary distribution shows an increasing trend, likely reflecting salary cap growth
 
 ### 4.3 Performance Metrics Distribution
 
@@ -241,10 +238,7 @@ p8 <- ggplot(player_data, aes(x = RAPM)) +
 grid.arrange(p5, p6, p7, p8, ncol = 2)
 ```
 
-**Observations:**
-- RAPM metrics are approximately normally distributed around zero
-- The distributions of offensive and defensive RAPM show similar patterns
-- These distributions differ from typical salary distributions, suggesting a non-linear relationship between performance and compensation
+**Observations:** - RAPM metrics are approximately normally distributed around zero - The distributions of offensive and defensive RAPM show similar patterns - These distributions differ from typical salary distributions, suggesting a non-linear relationship between performance and compensation
 
 ### 4.4 Salary vs. Performance Relationships
 
@@ -279,11 +273,7 @@ p12 <- performance_plot(player_data, "RAPM", "Salary vs RAPM", log_y = TRUE)
 grid.arrange(p9, p10, p11, p12, ncol = 2)
 ```
 
-**Observations:**
-- Clear positive relationships between salary and each RAPM metric
-- The LOESS smoothing curves suggest non-linear relationships
-- The relationship appears stronger for offensive metrics than defensive metrics
-- Year-to-year variation is evident in the salary-performance relationship
+**Observations:** - Clear positive relationships between salary and each RAPM metric - The LOESS smoothing curves suggest non-linear relationships - The relationship appears stronger for offensive metrics than defensive metrics - Year-to-year variation is evident in the salary-performance relationship
 
 ### 4.5 Year-over-Year Trends
 
@@ -331,10 +321,7 @@ grid.arrange(p13, p14, ncol = 2)
 print(p15)
 ```
 
-**Observations:**
-- Average salaries show a clear upward trend over the years
-- The correlation between RAPM and salary fluctuates by year
-- The relationship between performance and salary appears relatively consistent across years, but with some variation in slope
+**Observations:** - Average salaries show a clear upward trend over the years - The correlation between RAPM and salary fluctuates by year - The relationship between performance and salary appears relatively consistent across years, but with some variation in slope
 
 ## 5. Correlation Analysis
 
@@ -368,11 +355,7 @@ ggplot(salary_corr, aes(x = reorder(Variable, Correlation), y = Correlation)) +
   theme_minimal()
 ```
 
-**Observations:**
-- LA_RAPM metrics show moderate positive correlations with salary
-- Offensive metrics generally show stronger correlations with salary than defensive metrics
-- Year also shows a positive correlation with salary, reflecting the increasing salary cap
-- There's high correlation among different RAPM variants, suggesting they measure similar aspects of performance
+**Observations:** - LA_RAPM metrics show moderate positive correlations with salary - Offensive metrics generally show stronger correlations with salary than defensive metrics - Year also shows a positive correlation with salary, reflecting the increasing salary cap - There's high correlation among different RAPM variants, suggesting they measure similar aspects of performance
 
 ## 6. Advanced Exploratory Analysis
 
@@ -474,6 +457,7 @@ summary(model2)
 # Check multicollinearity
 vif(model2)
 ```
+
 In Model 2, both offensive and defensive performance metrics are significant predictors of NBA player salary. A 1-unit increase in offensive RAPM is associated with a 47.3% increase in salary, while a 1-unit increase in defensive RAPM corresponds to a 23.6% increase, holding other variables constant. Salaries appear to decline slightly over time when controlling for performance, with each additional year associated with a 5.5% decrease. However, the model explains only about 8.6% of the variance in salaries, suggesting that many non-performance factors influence pay. No multicollinearity issues are detected.
 
 ### 7.3 Non-Linear Effects
@@ -483,6 +467,7 @@ In Model 2, both offensive and defensive performance metrics are significant pre
 model3 <- lm(log(Salary) ~ LA_RAPM + I(LA_RAPM^2) + Year, data = player_data)
 summary(model3)
 ```
+
 In this quadratic model, both the linear and squared terms for RAPM are positive and highly significant. This suggests that player salary increases at an increasing rate with RAPM — players with exceptionally high RAPM earn disproportionately more than players with moderate RAPM. The adjusted R² improves to 10.7%, indicating that introducing nonlinearity better captures salary variation than a purely linear model. As in previous models, the year coefficient is negative, suggesting slight salary declines over time when holding performance constant.
 
 ### 7.4 Interaction with Year
@@ -538,6 +523,7 @@ ggplot(player_data, aes(x = log(Salary), y = Predicted_Log_Salary)) +
   theme_minimal() +
   coord_equal()
 ```
+
 The predicted vs. actual plot shows that while the model captures some of the variation in log salaries, substantial prediction error remains. The model tends to overestimate lower salaries and exhibits considerable scatter across all salary levels, reflecting the modest R² values observed. No obvious year-specific bias appears, suggesting the model's performance is relatively consistent across seasons.
 
 ## 8. Analyzing Value Inefficiencies
@@ -600,56 +586,53 @@ kable(format_salary_table(underpaid_players),
       caption = "Top 15 Potentially Underpaid Players")
 ```
 
-This visual shows us a lot of players were overpaid. 
+This visual shows us a lot of players were overpaid.
 
 ## 9. Discussion & Findings
 
 Based on our exploratory data analysis and regression modeling:
 
-1. **RAPM as Salary Predictor**:
-   - RAPM metrics show moderate correlation with player salaries
-   - The relationship is statistically significant but explains only part of salary variation
-   - Hypothesis H1 is partially supported: RAPM does predict salary but with limitations
-
-2. **Offensive vs. Defensive Value**:
-   - Offensive RAPM has a stronger relationship with salary than defensive RAPM
-   - This suggests teams may value offensive contributions more highly in their compensation decisions
-   - Hypothesis H3 is supported: there are systematic inefficiencies in how offensive vs. defensive contributions are valued
-
-3. **Year-over-Year Analysis**:
-   - Salary growth outpaces performance changes for many players
-   - Changes in performance don't always correlate strongly with changes in compensation
-   - Hypothesis H4 is supported: we observe consistent relationships between performance and salary across years
-
-4. **Model Performance**:
-   - Including year effects improves model performance considerably
-   - The most complex model explains approximately XX% of variation in player salaries
-   - Significant unexplained variation suggests other factors beyond RAPM affect compensation
+1.  **RAPM as Salary Predictor**:
+    -   RAPM metrics show moderate correlation with player salaries
+    -   The relationship is statistically significant but explains only part of salary variation
+    -   Hypothesis H1 is partially supported: RAPM does predict salary but with limitations
+2.  **Offensive vs. Defensive Value**:
+    -   Offensive RAPM has a stronger relationship with salary than defensive RAPM
+    -   This suggests teams may value offensive contributions more highly in their compensation decisions
+    -   Hypothesis H3 is supported: there are systematic inefficiencies in how offensive vs. defensive contributions are valued
+3.  **Year-over-Year Analysis**:
+    -   Salary growth outpaces performance changes for many players
+    -   Changes in performance don't always correlate strongly with changes in compensation
+    -   Hypothesis H4 is supported: we observe consistent relationships between performance and salary across years
+4.  **Model Performance**:
+    -   Including year effects improves model performance considerably
+    -   The most complex model explains approximately XX% of variation in player salaries
+    -   Significant unexplained variation suggests other factors beyond RAPM affect compensation
 
 ## 10. Limitations & Future Research
 
 **Limitations of the current analysis:**
 
-1. **Limited metrics**: We focused primarily on RAPM metrics without traditional box score statistics
-2. **Contract details**: We don't account for contract length, structure, or timing
-3. **Market factors**: Team market size, cap space, and competitive situation aren't considered
-4. **Player characteristics**: Age, experience, injury history, and intangible contributions aren't captured
+1.  **Limited metrics**: We focused primarily on RAPM metrics without traditional box score statistics
+2.  **Contract details**: We don't account for contract length, structure, or timing
+3.  **Market factors**: Team market size, cap space, and competitive situation aren't considered
+4.  **Player characteristics**: Age, experience, injury history, and intangible contributions aren't captured
 
 **Future research directions:**
 
-1. Incorporate additional performance metrics beyond RAPM
-2. Include contract details and salary cap information
-3. Account for player experience and career trajectory
-4. Consider team-level factors in salary determination
-5. Develop a more comprehensive model of player value
+1.  Incorporate additional performance metrics beyond RAPM
+2.  Include contract details and salary cap information
+3.  Account for player experience and career trajectory
+4.  Consider team-level factors in salary determination
+5.  Develop a more comprehensive model of player value
 
 ## 11. Conclusion
 
 This analysis demonstrates that NBA player salaries are related to on-court performance as measured by RAPM metrics, but the relationship is complex and influenced by various factors. Key findings suggest that:
 
-1. RAPM metrics explain a significant portion of salary variation
-2. Offensive contributions appear more highly valued than defensive contributions
-3. Salary inefficiencies exist, with some players significantly over or underpaid relative to their statistical performance
-4. Year-to-year trends show increasing salaries without corresponding performance increases
+1.  RAPM metrics explain a significant portion of salary variation
+2.  Offensive contributions appear more highly valued than defensive contributions
+3.  Salary inefficiencies exist, with some players significantly over or underpaid relative to their statistical performance
+4.  Year-to-year trends show increasing salaries without corresponding performance increases
 
 These insights contribute to our understanding of NBA labor markets and suggest opportunities for teams to gain competitive advantages through more efficient salary allocation. Future research should focus on developing more comprehensive models of player value that incorporate additional factors beyond performance metrics.
